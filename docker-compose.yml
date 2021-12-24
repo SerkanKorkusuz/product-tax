@@ -1,0 +1,74 @@
+version: "3"
+services:
+  product-service:
+    image: product-service
+    container_name: product-service-app
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    restart: always
+    env_file: ./.env
+    environment:
+      SPRING_APPLICATION_JSON: '{
+              "spring.datasource.url"  : "jdbc:mysql://mysqldb:3306/users_products?createDatabaseIfNotExist=true&autoReconnect=true&allowPublicKeyRetrieval=true&useSSL=false",
+              "spring.datasource.username" : "$MYSQL_USERNAME",
+              "spring.datasource.password" : "$MYSQL_PASSWORD",
+              "spring.jpa.properties.hibernate.dialect" : "org.hibernate.dialect.MySQL5InnoDBDialect",
+              "spring.jpa.hibernate.ddl-auto" : "update"
+              }'
+    depends_on:
+      - mysqldb
+    stdin_open: true
+    tty: true
+
+  tax-service:
+    image: tax-service
+    container_name: tax-service-app
+    build:
+      context: ./tax-service
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    restart: always
+    depends_on:
+      - mongo-db
+
+  mysqldb:
+    image: mysql:8
+    container_name: mysqldb
+    env_file: ./.env
+    ports:
+      - "3308:3306"
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=$MYSQL_PASSWORD
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./product-service/src/main/resources/data.sql:/data/application/init.sql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    links:
+      - mysqldb:db
+    ports:
+      - "8085:80"
+
+
+  mongo-db:
+    image: mongo:5.0
+    container_name: mongo-db
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=$MONGO_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD=$MONGO_ROOT_PASSWORD
+      - MONGO_INITDB_DATABASE=$MONGO_DB
+      - MONGO_DB_USERNAME=$MONGO_DB_USERNAME
+      - MONGO_DB_PASSWORD=$MONGO_DB_PASSWORD
+    command: [ "--bind_ip", "0.0.0.0" ]
+
+volumes:
+  db_data:
